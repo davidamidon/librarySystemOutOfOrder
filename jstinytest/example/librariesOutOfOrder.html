@@ -1,0 +1,141 @@
+<script src="../tinytest.js"></script>
+<script>
+
+(function () {
+  // Setup global variables
+  var libraryStorage = {};
+  var index;
+
+  function librarySystem(libraryName, dependencies, callback) {
+    // First check the passed argument types and adjust them accordingly.
+
+    // Check for anonymous functions.
+    if (typeof libraryName !== 'string') {
+      try {
+        throw new TypeError('Anonymous functions are not allowed. A string must be passed as the first argument.');
+      } catch (e) {
+        console.groupCollapsed('%c' + 'TypeError', 'color: red;');
+        console.error(e.stack);
+        console.groupEnd();
+      }
+    return;
+    }
+
+    // Check that the second argument is an array.
+    if (!Array.isArray(dependencies) && arguments.length === 2) {
+      // If only 2 arguments are passed then remap the arguments.
+      callback = dependencies;
+      dependencies = null;
+    } else if (!Array.isArray(dependencies) && arguments.length === 3) {
+      // If 3 arguments were passed, throw a typeError as dependencies must be an array.
+      try {
+        throw new TypeError('Expected Array as second argument');
+      } catch (e) {
+       	console.groupCollapsed('%c' + 'TypeError', 'color: red;');
+        console.error(e.stack);
+        console.groupEnd();
+      }
+    return;
+    }
+
+    // Work on the arguments.
+    // Either create the new library or return an existing library.
+    if(arguments.length === 2) {
+      // Create a new library object no dependencies.
+      libraryStorage[libraryName] = {
+        callback: callback
+      }
+    } else if(arguments.length === 3) {
+      // Create a new library object with dependencies.
+      libraryStorage[libraryName] = {
+        callback: callback,
+        dependencies: dependencies
+      }
+    } else {
+      // Create the Library
+      // Setup a variable to hold the dependency return values.
+      var returnOfDependencies = [];
+
+      // Check if the Library has been called before and if it has provide the return.
+      if(libraryStorage[libraryName].returnValue) {
+        return libraryStorage[libraryName].returnValue;
+      }
+
+      // Check if the library has dependencies and if it does,
+      // call each dependency to make it available for the parent library.
+      if(libraryStorage[libraryName].dependencies) {
+        libraryStorage[libraryName].dependencies.forEach(function(dependency) {
+          returnOfDependencies.push(libraryStorage[dependency].callback());
+        });
+      }
+
+      // If the Library has no dependencies, run it's callback and return it.
+      if(!libraryStorage[libraryName].dependencies) {
+        return libraryStorage[libraryName].returnValue = libraryStorage[libraryName].callback();
+      } else {
+        // If the Library has dependencies, run it's callback,
+        // pass in the dependencies and return it.
+        return libraryStorage[libraryName].returnValue = libraryStorage[libraryName].callback.apply(null, returnOfDependencies);
+      }
+    }
+  }
+
+  // Create the librarySystem on the Window.
+  window.librarySystem = librarySystem;
+})();
+
+tests({
+  'It should create a new libray when passed a libraryName and function.': function() {
+    librarySystem('david', function() {
+      return 'david';
+    })
+    eq(librarySystem('david'), 'david');
+  },
+  'It should create a new libray when passed a libraryName, an empty array, and a function.': function() {
+    librarySystem('payton', [], function() {
+      return 'payton';
+    })
+    eq(librarySystem('payton'), 'payton');
+  },
+  'It should create a new libray when passed a libraryName, an array of dependencies, and a function. When the dependencies are passed first.': function() {
+    librarySystem('name', [], function() {
+      return 'David';
+    });
+
+    librarySystem('location', [], function() {
+      return 'home';
+    });
+
+    librarySystem('workSpot', ['name', 'location'], function(name, location) {
+      return name + ' works from ' + location;
+    });
+    eq(librarySystem('workSpot'), 'David works from home');
+  },
+  'It should create a new libray when passed a libraryName, an array of dependencies, and a function. When the dependencies are passed after their dependent library.': function() {
+    librarySystem('parent', ['mother', 'child'], function(mother, child) {
+      return mother + ' is ' + child + "'s parent.";
+    });
+
+    librarySystem('mother', [], function() {
+      return 'Dianne';
+    });
+
+    librarySystem('child', [], function() {
+      return 'Payton';
+    });
+
+    eq(librarySystem('parent'), "Dianne is Payton's parent.");
+  },
+  'It should run the callback only once for each library.': function() {
+		var numberOfTimesCallbackHasRun = 0;
+		librarySystem('Fulcrum', [], function () {
+      numberOfTimesCallbackHasRun++;
+      return 'Ahsoka Tano';
+		});
+		librarySystem('Fulcrum');
+		librarySystem('Fulcrum');
+    librarySystem('Fulcrum');
+		eq(numberOfTimesCallbackHasRun, 1);
+	}
+});
+</script>
